@@ -165,16 +165,21 @@ class LocationService : Service() {
     }
 
     private fun handleNewLocation(location: Location) {
+        android.util.Log.d("LocationService", "Location received: accuracy=${location.accuracy}m")
+
+        // Update UI with current GPS state (even if we'll filter it out)
+        gpsAccuracy = location.accuracy
+        currentSpeed = location.speed * 3.6f // Convert m/s to km/h
+        currentElevation = location.altitude.toFloat()
+        elapsedTime = (System.currentTimeMillis() - startTime) / 1000
+
         if (location.accuracy > Constants.GPS_ACCURACY_THRESHOLD) {
+            android.util.Log.w("LocationService", "Location filtered out: accuracy ${location.accuracy}m > threshold ${Constants.GPS_ACCURACY_THRESHOLD}m")
             return
         }
 
+        android.util.Log.i("LocationService", "Location accepted: lat=${location.latitude}, lon=${location.longitude}, accuracy=${location.accuracy}m")
         val trackPoint = TrackPoint.fromLocation(location)
-
-        currentSpeed = trackPoint.speed
-        currentElevation = trackPoint.elevation.toFloat()
-        gpsAccuracy = trackPoint.accuracy
-        elapsedTime = (System.currentTimeMillis() - startTime) / 1000
 
         serviceScope.launch {
             _locationFlow.emit(trackPoint)

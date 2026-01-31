@@ -37,7 +37,8 @@ class GpxRepository @Inject constructor(
         synchronized(trackPoints) {
             val previousPoint = trackPoints.lastOrNull()
             trackPoints.add(point)
-            
+            android.util.Log.i("GpxRepository", "Track point added. Total points: ${trackPoints.size}")
+
             val elapsedTime = (System.currentTimeMillis() - startTime) / 1000
             val newStats = StatsCalculator.calculateIncrementalStats(
                 _currentStats.value,
@@ -79,9 +80,12 @@ class GpxRepository @Inject constructor(
     }
 
     suspend fun resumeSession(session: RecordingSession) {
+        synchronized(trackPoints) {
+            trackPoints.clear()
+            lastSavedIndex = 0
+        }
         currentSession = session
         startTime = session.startTime
-        lastSavedIndex = session.lastSavedPointIndex
         _currentStats.value = StatsCalculator.TrackStats(
             distance = session.distance,
             elevationGain = session.elevationGain,
@@ -89,11 +93,12 @@ class GpxRepository @Inject constructor(
             maxSpeed = session.maxSpeed,
             pointCount = session.pointCount
         )
-        
+
         // Load existing points from temp file if available
         session.tempFilePath?.let { path ->
             loadPointsFromTempFile(path)
         }
+        lastSavedIndex = trackPoints.size  // match loaded points
     }
 
     suspend fun saveTempGpx(): String? = withContext(Dispatchers.IO) {
@@ -189,11 +194,13 @@ class GpxRepository @Inject constructor(
     }
 
     suspend fun clearCurrentSession() {
+        val sessionId = currentSession?.id
         currentSession = null
         trackPoints.clear()
         lastSavedIndex = 0
         _currentStats.value = StatsCalculator.TrackStats()
         getTempGpxFile().delete()
+        sessionId?.let { sessionDao.markSessionInactive(it) }
     }
 
     suspend fun getActiveSession(): RecordingSession? {
@@ -203,6 +210,8 @@ class GpxRepository @Inject constructor(
     fun getActiveSessionFlow(): Flow<RecordingSession?> {
         return sessionDao.getActiveSessionFlow()
     }
+
+    fun getCurrentSession(): RecordingSession? = currentSession
 
     private fun getTempGpxFile(): File {
         val cacheDir = File(context.cacheDir, Constants.GPX_CACHE_DIR).apply {

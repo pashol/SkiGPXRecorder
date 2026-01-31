@@ -61,6 +61,11 @@ class RecordingViewModel @Inject constructor(
                                 _uiState.update { it.copy(batteryWarning = true) }
                             }
                         }
+
+                        // Race fix: if service was already recording when we bind, sync UI
+                        if (service.isCurrentlyRecording() && !_uiState.value.isRecording) {
+                            syncWithRunningService()
+                        }
                     }
                 } else {
                     locationFlowJob?.cancel()
@@ -105,10 +110,15 @@ class RecordingViewModel @Inject constructor(
     }
 
     fun checkForActiveSession() {
+        if (_uiState.value.isRecording) return
+        if (locationServiceManager.isRecording()) {
+            syncWithRunningService()
+            return
+        }
         viewModelScope.launch {
             val activeSession = gpxRepository.getActiveSession()
             if (activeSession != null) {
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         showResumeDialog = true,
                         interruptedSession = activeSession
@@ -118,13 +128,27 @@ class RecordingViewModel @Inject constructor(
         }
     }
 
+    private fun syncWithRunningService() {
+        val session = gpxRepository.getCurrentSession()
+        startTime = session?.startTime ?: System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                isRecording = true,
+                showResumeDialog = false,
+                interruptedSession = null,
+                startTime = startTime
+            )
+        }
+        startTimer()
+    }
+
     fun onResumeSessionConfirmed() {
         val session = _uiState.value.interruptedSession ?: return
-        
+
         viewModelScope.launch {
             gpxRepository.resumeSession(session)
             startTime = session.startTime
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isRecording = true,
                     showResumeDialog = false,

@@ -9,7 +9,10 @@
     <!-- Foreground Service Permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    
+
+    <!-- Wake Lock Permission (to prevent sleep during recording) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Notification Permission (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
