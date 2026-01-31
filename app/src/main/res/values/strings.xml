@@ -1,0 +1,53 @@
+<resources>
+    <string name="app_name">Ski GPX Recorder</string>
+    
+    <!-- Recording Screen -->
+    <string name="start_recording">Start Recording</string>
+    <string name="stop_recording">Stop Recording</string>
+    <string name="recording_in_progress">Recording in Progress</string>
+    <string name="ready_to_record">Ready to Record</string>
+    
+    <!-- Stats Labels -->
+    <string name="current_speed">Current Speed</string>
+    <string name="distance">Distance</string>
+    <string name="elapsed_time">Elapsed Time</string>
+    <string name="elevation">Elevation</string>
+    <string name="gps_accuracy">GPS Accuracy</string>
+    <string name="max_speed">Max Speed</string>
+    <string name="avg_speed">Avg Speed</string>
+    <string name="elevation_gain">Elevation Gain</string>
+    <string name="elevation_loss">Elevation Loss</string>
+    <string name="points_recorded">Points Recorded</string>
+    
+    <!-- Units -->
+    <string name="km_h">km/h</string>
+    <string name="meters">m</string>
+    <string name="points">points</string>
+    
+    <!-- Notifications -->
+    <string name="recording_notification_title">Ski GPX Recording</string>
+    <string name="recording_notification_text">Recording your ski run</string>
+    <string name="notification_channel_name">Recording</string>
+    <string name="notification_channel_description">Shows when recording is in progress</string>
+    
+    <!-- Export -->
+    <string name="share_gpx">Share GPX</string>
+    <string name="save_to_downloads">Save to Downloads</string>
+    <string name="recording_saved">Recording saved successfully</string>
+    <string name="recording_complete">Recording Complete</string>
+    
+    <!-- Warnings -->
+    <string name="low_battery_warning">Low Battery Warning</string>
+    <string name="low_battery_message">Battery is at 10%. Consider stopping recording.</string>
+    <string name="auto_stop_message">Recording stopped due to low battery (5%)</string>
+    <string name="resume_recording">Resume Recording?</string>
+    <string name="resume_recording_message">An interrupted recording was found. Would you like to resume?</string>
+    <string name="resume">Resume</string>
+    <string name="discard">Discard</string>
+    
+    <!-- Permissions -->
+    <string name="location_permission_required">Location Permission Required</string>
+    <string name="location_permission_rationale">This app needs location permission to record your ski runs.</string>
+    <string name="permission_denied">Permission denied. Cannot record without location access.</string>
+    <string name="open_settings">Open Settings</string>
+</resources>
