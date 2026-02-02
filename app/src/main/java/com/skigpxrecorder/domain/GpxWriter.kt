@@ -26,6 +26,12 @@ object GpxWriter {
                 appendLine("""      <trkpt lat="${point.latitude}" lon="${point.longitude}">""")
                 appendLine("""        <ele>${point.elevation}</ele>""")
                 appendLine("""        <time>${formatIsoTime(point.timestamp)}</time>""")
+                // Include accuracy in extensions for post-processing filtering
+                if (point.accuracy > 0f) {
+                    appendLine("""        <extensions>""")
+                    appendLine("""          <accuracy>${point.accuracy}</accuracy>""")
+                    appendLine("""        </extensions>""")
+                }
                 appendLine("""      </trkpt>""")
             }
 

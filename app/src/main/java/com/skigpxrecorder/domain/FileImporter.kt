@@ -26,9 +26,12 @@ class FileImporter @Inject constructor(
     }
 
     suspend fun importFile(uri: Uri): ImportResult {
+        android.util.Log.d("FileImporter", "Starting import for URI: $uri")
         return try {
             val inputStream: InputStream = context.contentResolver.openInputStream(uri)
-                ?: return ImportResult.Error("Could not open file")
+                ?: return ImportResult.Error("Could not open file").also {
+                    android.util.Log.e("FileImporter", "Could not open input stream for URI: $uri")
+                }
 
             val fileName = getFileName(uri)
             val fileType = getFileType(fileName)
@@ -67,7 +70,9 @@ class FileImporter @Inject constructor(
                 source = DataSource.IMPORTED_GPX,
                 isLive = false
             )
+            android.util.Log.d("FileImporter", "Saving session to database: ${gpxData.metadata.sessionId}")
             gpxRepository.createImportedSession(gpxData, fileName)
+            android.util.Log.d("FileImporter", "Session saved successfully")
             ImportResult.Success(gpxData)
         } catch (e: Exception) {
             ImportResult.Error("GPX parsing failed: ${e.message}")
@@ -75,6 +80,20 @@ class FileImporter @Inject constructor(
     }
 
     private fun getFileName(uri: Uri): String {
+        // Try to get display name from content resolver first
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val displayNameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (displayNameIndex >= 0) {
+                    val displayName = cursor.getString(displayNameIndex)
+                    if (!displayName.isNullOrEmpty()) {
+                        return displayName
+                    }
+                }
+            }
+        }
+        
+        // Fallback to URI path
         val path = uri.path ?: return "unknown.gpx"
         return path.substringAfterLast('/')
     }

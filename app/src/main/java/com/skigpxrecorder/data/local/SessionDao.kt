@@ -16,8 +16,14 @@ interface SessionDao {
     @Query("SELECT * FROM recording_sessions WHERE isActive = 1 LIMIT 1")
     fun getActiveSessionFlow(): Flow<RecordingSession?>
 
+    @Query("SELECT * FROM recording_sessions WHERE id = :sessionId LIMIT 1")
+    suspend fun getSessionById(sessionId: String): RecordingSession?
+
     @Query("SELECT * FROM recording_sessions ORDER BY startTime DESC")
     fun getAllSessions(): Flow<List<RecordingSession>>
+
+    @Query("SELECT * FROM recording_sessions WHERE isActive = 0 ORDER BY startTime DESC")
+    fun getCompletedSessions(): Flow<List<RecordingSession>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: RecordingSession)

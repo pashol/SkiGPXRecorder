@@ -60,13 +60,14 @@ SkiGPXRecorder is an Android application that records GPS tracks during skiing a
 - Implements battery monitoring with auto-stop at low battery
 - Uses WakeLock to prevent sleep during recording
 - Auto-saves GPX data periodically (see Constants.AUTO_SAVE_INTERVAL)
-- Filters location points based on GPS accuracy threshold
+- Records all GPS positions with accuracy metadata for post-processing filtering
 
 **GpxRepository**
 - Manages in-memory track points and database sessions
 - Handles GPX file generation and saving to external storage
 - Provides statistics calculation (distance, speed, elevation)
 - Implements temporary save functionality for crash recovery
+- Exports accuracy data in GPX extensions for each track point
 
 **LocationServiceManager**
 - Mediates between UI (ViewModel) and LocationService
@@ -82,16 +83,17 @@ SkiGPXRecorder is an Android application that records GPS tracks during skiing a
 1. User initiates recording in RecordingScreen
 2. RecordingViewModel starts LocationService via LocationServiceManager
 3. LocationService requests high-accuracy location updates from FusedLocationProviderClient
-4. New locations are filtered by accuracy, converted to TrackPoints, and emitted via SharedFlow
+4. All location updates are converted to TrackPoints (with accuracy metadata) and emitted via SharedFlow
 5. Repository stores points in memory and persists to Room database
 6. ViewModel collects updates and exposes them to UI
-7. Auto-save periodically writes temporary GPX files
-8. On session end, final GPX file is generated and saved to external storage
+7. Auto-save periodically writes temporary GPX files with accuracy extensions
+8. On session end, final GPX file is generated and saved to external storage with accuracy data
+9. Users can filter waypoints by accuracy during post-processing
 
 ### Important Constants
 All thresholds and intervals are centralized in `util/Constants.kt`:
 - `LOCATION_UPDATE_INTERVAL`: GPS update frequency
-- `GPS_ACCURACY_THRESHOLD`: Maximum acceptable GPS accuracy in meters
+- `GPS_ACCURACY_THRESHOLD`: Reference value for UI display (no longer used for filtering)
 - `AUTO_SAVE_INTERVAL`: How often to save temporary GPX files
 - `BATTERY_WARNING_THRESHOLD` / `BATTERY_AUTO_STOP_THRESHOLD`: Battery management levels
 
@@ -120,3 +122,4 @@ LocationService runs as a foreground service with `foregroundServiceType="locati
 - GPX files are saved to app-specific external storage using scoped storage (no WRITE_EXTERNAL_STORAGE permission needed on API 29+)
 - The service uses PARTIAL_WAKE_LOCK without timeout - ensure proper cleanup on service destruction
 - Battery monitoring uses BroadcastReceiver for ACTION_BATTERY_CHANGED
+- GPS accuracy filtering is disabled - all positions are recorded with accuracy metadata in GPX extensions for post-processing

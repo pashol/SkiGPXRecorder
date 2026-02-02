@@ -6,23 +6,43 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.compose.rememberNavController
 import com.skigpxrecorder.ui.RecordingScreen
+import com.skigpxrecorder.domain.FileImporter
 import com.skigpxrecorder.ui.RecordingViewModel
+import com.skigpxrecorder.ui.import.FileImportHandler
+import com.skigpxrecorder.ui.navigation.AppDrawer
+import com.skigpxrecorder.ui.navigation.AppNavigation
+import com.skigpxrecorder.ui.navigation.Screen
 import com.skigpxrecorder.ui.theme.SkiGPXRecorderTheme
 import com.skigpxrecorder.util.PermissionHelper
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: RecordingViewModel by viewModels()
+
+    @Inject
+    lateinit var fileImporter: FileImporter
 
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -50,14 +70,53 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SkiGPXRecorderTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                val navController = rememberNavController()
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val scope = rememberCoroutineScope()
+                val snackbarHostState = remember { SnackbarHostState() }
+                var triggerFileImport by remember { mutableStateOf(false) }
+
+                // File import handler
+                FileImportHandler(
+                    fileImporter = fileImporter,
+                    onImportSuccess = { sessionId ->
+                        scope.launch {
+                            snackbarHostState.showSnackbar("File imported successfully")
+                            navController.navigate(Screen.Session.createRoute(sessionId))
+                        }
+                    },
+                    onImportError = { error ->
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Import failed: $error")
+                        }
+                    },
+                    trigger = triggerFileImport,
+                    onTriggerConsumed = { triggerFileImport = false }
+                )
+
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    drawerContent = {
+                        AppDrawer(
+                            navController = navController,
+                            drawerState = drawerState,
+                            scope = scope,
+                            onOpenFile = { triggerFileImport = true }
+                        )
+                    }
                 ) {
-                    RecordingScreen(
-                        viewModel = viewModel,
-                        onRequestPermission = { checkAndRequestPermissions() }
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        AppNavigation(
+                            navController = navController,
+                            drawerState = drawerState,
+                            scope = scope,
+                            recordingViewModel = viewModel,
+                            onRequestPermission = { checkAndRequestPermissions() }
+                        )
+                    }
                 }
             }
         }

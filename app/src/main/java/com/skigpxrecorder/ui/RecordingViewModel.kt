@@ -87,9 +87,19 @@ class RecordingViewModel @Inject constructor(
                         elevationGain = stats.elevationGain,
                         elevationLoss = stats.elevationLoss,
                         avgSpeed = stats.avgSpeed,
-                        pointCount = stats.pointCount
+                        pointCount = stats.pointCount,
+                        skiDistance = stats.skiDistance,
+                        skiVertical = stats.skiVertical,
+                        avgSkiSpeed = stats.avgSkiSpeed
                     )
                 }
+            }
+            .launchIn(viewModelScope)
+
+        // Observe repository runs
+        gpxRepository.currentRuns
+            .onEach { runs ->
+                _uiState.update { it.copy(runCount = runs.size) }
             }
             .launchIn(viewModelScope)
 
@@ -296,7 +306,7 @@ data class RecordingUiState(
     val recordingFilePath: String? = null,
     val savedTrackName: String? = null,
     val startTime: Long = 0,
-    
+
     // Live stats
     val currentSpeed: Float = 0f,
     val distance: Float = 0f,
@@ -307,5 +317,11 @@ data class RecordingUiState(
     val elevationGain: Float = 0f,
     val elevationLoss: Float = 0f,
     val avgSpeed: Float = 0f,
-    val pointCount: Int = 0
+    val pointCount: Int = 0,
+    val runCount: Int = 0,
+
+    // Ski-specific stats
+    val skiDistance: Float = 0f,
+    val skiVertical: Float = 0f,
+    val avgSkiSpeed: Float = 0f
 )

@@ -2,9 +2,16 @@ package com.skigpxrecorder.data.repository
 
 import android.content.Context
 import com.skigpxrecorder.data.local.SessionDao
+import com.skigpxrecorder.data.local.SkiRunDao
+import com.skigpxrecorder.data.local.TrackPointDao
+import com.skigpxrecorder.data.model.DataSource
+import com.skigpxrecorder.data.model.GPXData
 import com.skigpxrecorder.data.model.RecordingSession
+import com.skigpxrecorder.data.model.SkiRun
 import com.skigpxrecorder.data.model.TrackPoint
 import com.skigpxrecorder.domain.GpxWriter
+import com.skigpxrecorder.domain.RunDetector
+import com.skigpxrecorder.domain.SessionAnalyzer
 import com.skigpxrecorder.domain.StatsCalculator
 import com.skigpxrecorder.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,7 +29,10 @@ import javax.inject.Singleton
 @Singleton
 class GpxRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val sessionDao: SessionDao
+    private val sessionDao: SessionDao,
+    private val trackPointDao: TrackPointDao,
+    private val skiRunDao: SkiRunDao,
+    private val runDetector: RunDetector
 ) {
     private val trackPoints = mutableListOf<TrackPoint>()
     private var currentSession: RecordingSession? = null
@@ -31,7 +41,11 @@ class GpxRepository @Inject constructor(
     private val _currentStats = MutableStateFlow(StatsCalculator.TrackStats())
     val currentStats: StateFlow<StatsCalculator.TrackStats> = _currentStats.asStateFlow()
 
+    private val _currentRuns = MutableStateFlow<List<SkiRun>>(emptyList())
+    val currentRuns: StateFlow<List<SkiRun>> = _currentRuns.asStateFlow()
+
     private var startTime: Long = 0
+    private var lastRunDetectionTime: Long = 0
 
     fun addTrackPoint(point: TrackPoint) {
         synchronized(trackPoints) {
@@ -46,8 +60,50 @@ class GpxRepository @Inject constructor(
                 previousPoint,
                 elapsedTime
             )
-            _currentStats.value = newStats
+
+            // Run detection (throttled - every 5 seconds)
+            val now = System.currentTimeMillis()
+            if (now - lastRunDetectionTime > 5000 && trackPoints.size > 10) {
+                lastRunDetectionTime = now
+                val detectedRuns = runDetector.detectRunsIncremental(
+                    trackPoints.toList(),
+                    _currentRuns.value
+                )
+                _currentRuns.value = detectedRuns
+                android.util.Log.i("GpxRepository", "Runs detected: ${detectedRuns.size}")
+
+                // Calculate ski stats from detected runs
+                val (skiDistance, skiVertical, avgSkiSpeed) = calculateSkiStats(detectedRuns)
+                _currentStats.value = newStats.copy(
+                    skiDistance = skiDistance,
+                    skiVertical = skiVertical,
+                    avgSkiSpeed = avgSkiSpeed
+                )
+            } else {
+                _currentStats.value = newStats
+            }
         }
+    }
+
+    /**
+     * Calculate ski-specific statistics from detected runs
+     * Returns Triple of (skiDistance, skiVertical, avgSkiSpeed)
+     */
+    private fun calculateSkiStats(runs: List<SkiRun>): Triple<Float, Float, Float> {
+        if (runs.isEmpty()) return Triple(0f, 0f, 0f)
+
+        val skiDistance = runs.sumOf { it.distance.toDouble() }.toFloat()
+        val skiVertical = runs.sumOf { it.verticalDrop.toDouble() }.toFloat()
+
+        // Distance-weighted average speed
+        val totalDist = runs.sumOf { it.distance.toDouble() }
+        val avgSkiSpeed = if (totalDist > 0) {
+            (runs.sumOf { it.avgSpeed * it.distance.toDouble() } / totalDist).toFloat()
+        } else {
+            0f
+        }
+
+        return Triple(skiDistance, skiVertical, avgSkiSpeed)
     }
 
     fun getTrackPoints(): List<TrackPoint> {
@@ -63,19 +119,20 @@ class GpxRepository @Inject constructor(
     suspend fun startNewSession(): String {
         val sessionId = UUID.randomUUID().toString()
         startTime = System.currentTimeMillis()
-        
+
         currentSession = RecordingSession(
             id = sessionId,
             startTime = startTime,
             isActive = true
         )
-        
+
         trackPoints.clear()
         lastSavedIndex = 0
         _currentStats.value = StatsCalculator.TrackStats()
-        
+        _currentRuns.value = emptyList()  // Reset runs for new session
+
         sessionDao.insertSession(currentSession!!)
-        
+
         return sessionId
     }
 
@@ -158,6 +215,11 @@ class GpxRepository @Inject constructor(
             pointsSnapshot = trackPoints.toList()
         }
 
+        // Run final batch detection with full algorithm (includes segment combination)
+        val finalRuns = RunDetector.detectRuns(pointsSnapshot)
+        _currentRuns.value = finalRuns
+        android.util.Log.i("GpxRepository", "Final batch detection: ${finalRuns.size} runs")
+
         val trackName = GpxWriter.generateTrackName()
         val gpxContent = GpxWriter.generateGpx(pointsSnapshot, trackName)
 
@@ -167,6 +229,20 @@ class GpxRepository @Inject constructor(
 
         val finalFile = File(cacheDir, "$trackName${Constants.GPX_FILE_EXTENSION}")
         finalFile.writeText(gpxContent)
+
+        // Persist track points to database before clearing in-memory data
+        val trackPointEntities = pointsSnapshot.map { point ->
+            com.skigpxrecorder.data.model.TrackPointEntity.fromTrackPoint(session.id, point)
+        }
+        trackPointDao.insertTrackPoints(trackPointEntities)
+
+        // Persist final detected runs to database
+        if (finalRuns.isNotEmpty()) {
+            val skiRunEntities = finalRuns.map { run ->
+                com.skigpxrecorder.data.model.SkiRunEntity.fromSkiRun(session.id, run)
+            }
+            skiRunDao.insertRuns(skiRunEntities)
+        }
 
         sessionDao.markSessionInactive(session.id)
 
@@ -198,7 +274,9 @@ class GpxRepository @Inject constructor(
         currentSession = null
         trackPoints.clear()
         lastSavedIndex = 0
+        lastRunDetectionTime = 0
         _currentStats.value = StatsCalculator.TrackStats()
+        _currentRuns.value = emptyList()
         getTempGpxFile().delete()
         sessionId?.let { sessionDao.markSessionInactive(it) }
     }
@@ -212,6 +290,50 @@ class GpxRepository @Inject constructor(
     }
 
     fun getCurrentSession(): RecordingSession? = currentSession
+
+    suspend fun createImportedSession(
+        gpxData: com.skigpxrecorder.data.model.GPXData,
+        fileName: String
+    ): String = withContext(Dispatchers.IO) {
+        val sessionId = gpxData.metadata.sessionId
+        val sessionName = gpxData.metadata.sessionName
+
+        // Create session entity
+        val session = RecordingSession(
+            id = sessionId,
+            startTime = gpxData.trackPoints.firstOrNull()?.timestamp ?: System.currentTimeMillis(),
+            endTime = gpxData.trackPoints.lastOrNull()?.timestamp ?: System.currentTimeMillis(),
+            distance = gpxData.stats.totalDistance,
+            elevationGain = gpxData.stats.skiVertical,
+            elevationLoss = gpxData.stats.totalDescent,
+            maxSpeed = gpxData.stats.maxSpeed,
+            pointCount = gpxData.trackPoints.size,
+            isActive = false,
+            tempFilePath = null,
+            lastSavedPointIndex = gpxData.trackPoints.size,
+            finalFilePath = null,
+            sessionName = sessionName,
+            runsCount = gpxData.runs.size,
+            source = com.skigpxrecorder.data.model.DataSource.IMPORTED_GPX.name
+        )
+
+        // Insert session
+        sessionDao.insertSession(session)
+
+        // Insert track points
+        val trackPointEntities = gpxData.trackPoints.map { point ->
+            com.skigpxrecorder.data.model.TrackPointEntity.fromTrackPoint(sessionId, point)
+        }
+        trackPointDao.insertTrackPoints(trackPointEntities)
+
+        // Insert runs
+        val runEntities = gpxData.runs.map { run ->
+            com.skigpxrecorder.data.model.SkiRunEntity.fromSkiRun(sessionId, run)
+        }
+        skiRunDao.insertRuns(runEntities)
+
+        sessionId
+    }
 
     private fun getTempGpxFile(): File {
         val cacheDir = File(context.cacheDir, Constants.GPX_CACHE_DIR).apply {
@@ -267,9 +389,9 @@ class GpxRepository @Inject constructor(
     private fun appendPointsToGpx(file: File, points: List<TrackPoint>) {
         val content = file.readText()
         val insertPoint = content.lastIndexOf("</trkseg>")
-        
+
         if (insertPoint == -1) return
-        
+
         val newPointsXml = buildString {
             points.forEach { point ->
                 appendLine("""      <trkpt lat="${point.latitude}" lon="${point.longitude}">""")
@@ -278,11 +400,55 @@ class GpxRepository @Inject constructor(
                 appendLine("""      </trkpt>""")
             }
         }
-        
+
         val newContent = StringBuilder(content)
             .insert(insertPoint, newPointsXml)
             .toString()
-        
+
         file.writeText(newContent)
+    }
+
+    /**
+     * Get completed sessions flow for history screen
+     */
+    fun getCompletedSessions(): Flow<List<RecordingSession>> {
+        return sessionDao.getCompletedSessions()
+    }
+
+    /**
+     * Delete a session and all associated data
+     */
+    suspend fun deleteSessionFull(sessionId: String) = withContext(Dispatchers.IO) {
+        // Delete from database (cascade will handle track points and runs)
+        sessionDao.deleteSession(sessionId)
+
+        // Delete associated GPX files if they exist
+        val session = sessionDao.getSessionById(sessionId)
+        session?.finalFilePath?.let { path ->
+            File(path).delete()
+        }
+        session?.tempFilePath?.let { path ->
+            File(path).delete()
+        }
+    }
+
+    /**
+     * Load complete session data as GPXData
+     */
+    suspend fun loadSessionData(sessionId: String): GPXData? = withContext(Dispatchers.IO) {
+        val session = sessionDao.getSessionById(sessionId) ?: return@withContext null
+        val trackPointEntities = trackPointDao.getTrackPointsForSession(sessionId)
+        val skiRunEntities = skiRunDao.getRunsForSession(sessionId)
+
+        val points = trackPointEntities.map { it.toTrackPoint() }
+        val runs = skiRunEntities.map { it.toSkiRun() }
+
+        SessionAnalyzer.analyzeSession(
+            sessionId = sessionId,
+            sessionName = session.sessionName ?: "Ski Session",
+            points = points,
+            source = DataSource.valueOf(session.source),
+            isLive = false
+        ).copy(runs = runs)
     }
 }

@@ -18,6 +18,10 @@
     <string name="elevation_gain">Elevation Gain</string>
     <string name="elevation_loss">Elevation Loss</string>
     <string name="points_recorded">Points Recorded</string>
+    <string name="ski_distance">Ski Distance</string>
+    <string name="ski_vertical">Ski Vertical</string>
+    <string name="avg_ski_speed">Avg Ski Speed</string>
+    <string name="runs">Runs</string>
     
     <!-- Units -->
     <string name="km_h">km/h</string>
