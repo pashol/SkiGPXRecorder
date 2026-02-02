@@ -16,7 +16,8 @@ data class TrackPoint(
     val elevation: Double,
     val timestamp: Long, // epoch milliseconds
     val accuracy: Float = 0f,
-    val speed: Float = 0f
+    val speed: Float = 0f,
+    val heartRate: Float? = null
 ) {
     companion object {
         fun fromLocation(location: Location): TrackPoint {
@@ -48,12 +49,17 @@ data class RecordingSession(
     @PrimaryKey
     val id: String,
     val startTime: Long,
+    val endTime: Long? = null,
     val isActive: Boolean = true,
     val lastSavedPointIndex: Int = 0,
     val tempFilePath: String? = null,
+    val finalFilePath: String? = null,
+    val sessionName: String? = null,
     val pointCount: Int = 0,
     val distance: Float = 0f,
     val elevationGain: Float = 0f,
     val elevationLoss: Float = 0f,
-    val maxSpeed: Float = 0f
+    val maxSpeed: Float = 0f,
+    val runsCount: Int = 0,
+    val source: String = "RECORDED" // DataSource enum as string
 )

@@ -3,6 +3,7 @@ package com.skigpxrecorder.ui
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
+import androidx.navigation.NavController
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -20,14 +21,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,6 +41,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,19 +63,38 @@ import com.skigpxrecorder.ui.theme.RedError
 @Composable
 fun RecordingScreen(
     viewModel: RecordingViewModel,
+    navController: NavController? = null,
+    drawerState: DrawerState? = null,
+    scope: CoroutineScope? = null,
     onRequestPermission: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val localScope = scope ?: rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         text = stringResource(R.string.app_name),
                         style = MaterialTheme.typography.titleLarge
                     )
+                },
+                navigationIcon = {
+                    drawerState?.let { drawer ->
+                        IconButton(onClick = {
+                            localScope.launch {
+                                drawer.open()
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Menu",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -291,7 +318,40 @@ private fun RecordingStats(uiState: RecordingUiState) {
                     unit = stringResource(R.string.meters)
                 )
             }
-            
+
+            // Ski-specific stats
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(
+                    label = stringResource(R.string.ski_distance),
+                    value = "%.0f".format(uiState.skiDistance),
+                    unit = stringResource(R.string.meters)
+                )
+                StatItem(
+                    label = stringResource(R.string.ski_vertical),
+                    value = "%.0f".format(uiState.skiVertical),
+                    unit = stringResource(R.string.meters)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(
+                    label = stringResource(R.string.avg_ski_speed),
+                    value = "%.1f".format(uiState.avgSkiSpeed),
+                    unit = stringResource(R.string.km_h)
+                )
+                StatItem(
+                    label = stringResource(R.string.runs),
+                    value = uiState.runCount.toString(),
+                    unit = ""
+                )
+            }
+
             // Point count
             Box(
                 modifier = Modifier.fillMaxWidth(),

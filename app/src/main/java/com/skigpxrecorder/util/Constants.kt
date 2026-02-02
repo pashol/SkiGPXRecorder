@@ -10,9 +10,6 @@ object Constants {
     // GPS accuracy threshold (meters)
     const val GPS_ACCURACY_THRESHOLD = 30f
 
-    // Elevation change threshold (meters) - ignore changes smaller than this
-    const val ELEVATION_CHANGE_THRESHOLD = 3f
-
     // Battery thresholds
     const val BATTERY_WARNING_THRESHOLD = 10 // 10%
     const val BATTERY_AUTO_STOP_THRESHOLD = 5 // 5%
@@ -40,4 +37,14 @@ object Constants {
     // Storage
     const val GPX_CACHE_DIR = "gpx"
     const val DOWNLOADS_SUBDIR = "SkiGPX"
+
+    // Run Detection - Window-based algorithm (matches Ski-GPX-Analyzer)
+    const val RUN_DETECTION_SPEED_THRESHOLD = 5.0f // km/h - minimum speed to be considered moving
+    const val RUN_DETECTION_MIN_DURATION = 60 // seconds - minimum run duration
+    const val RUN_DETECTION_MIN_VERTICAL = 30f // meters - minimum vertical drop
+    const val RUN_DETECTION_TREND_WINDOW = 20 // points - window size for trend-based detection
+    const val RUN_DETECTION_MIN_WINDOW_DROP = 10f // meters - minimum elevation drop in window
+    const val RUN_DETECTION_MAX_GAP_TIME = 120 // seconds - maximum gap time to combine segments
+    const val RUN_DETECTION_MAX_ASCENT_IN_GAP = 50f // meters - maximum ascent in gap to combine segments
+    const val SPEED_SMOOTHING_WINDOW = 5 // points - window size for speed smoothing
 }
