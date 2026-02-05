@@ -6,23 +6,31 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.skigpxrecorder.ui.theme.AppCardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.skigpxrecorder.data.local.UserPreferences
 import com.skigpxrecorder.data.model.RecordingSession
 import com.skigpxrecorder.ui.navigation.Screen
 import com.skigpxrecorder.util.UnitConverter
@@ -50,6 +59,8 @@ fun SessionHistoryScreen(
     onOpenFile: () -> Unit = {}
 ) {
     val sessions by viewModel.sessions.collectAsState()
+    val groupedSessions by viewModel.groupedSessions.collectAsState()
+    val groupingMode by viewModel.groupingMode.collectAsState()
 
     Scaffold(
         topBar = {
@@ -59,44 +70,107 @@ fun SessionHistoryScreen(
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    IconButton(onClick = onOpenFile) {
+                        Icon(Icons.Default.Add, contentDescription = "Import GPX/FIT")
+                    }
                 }
             )
+        },
+        floatingActionButton = {
+            if (sessions.isNotEmpty()) {
+                FloatingActionButton(
+                    onClick = {
+                        navController.navigate(Screen.MapAllSessions.route)
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Place,
+                        contentDescription = "Show all sessions on map",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
         }
     ) { paddingValues ->
-        if (sessions.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No recorded sessions yet",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = sessions,
-                    key = { it.id }
-                ) { session ->
-                    SessionCard(
-                        session = session,
-                        onClick = {
-                            navController.navigate(Screen.Session.createRoute(session.id))
-                        },
-                        onDelete = {
-                            viewModel.deleteSession(session.id)
-                        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Grouping toggle tabs
+            if (sessions.isNotEmpty()) {
+                TabRow(
+                    selectedTabIndex = when (groupingMode) {
+                        UserPreferences.HistoryGrouping.LOCATION -> 0
+                        UserPreferences.HistoryGrouping.DATE -> 1
+                    }
+                ) {
+                    Tab(
+                        selected = groupingMode == UserPreferences.HistoryGrouping.LOCATION,
+                        onClick = { viewModel.setGroupingMode(UserPreferences.HistoryGrouping.LOCATION) },
+                        text = { Text("STANDORT") }
                     )
+                    Tab(
+                        selected = groupingMode == UserPreferences.HistoryGrouping.DATE,
+                        onClick = { viewModel.setGroupingMode(UserPreferences.HistoryGrouping.DATE) },
+                        text = { Text("DATUM") }
+                    )
+                }
+            }
+
+            // Session list
+            if (sessions.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No recorded sessions yet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    groupedSessions.forEach { group ->
+                        // Group header
+                        item {
+                            Text(
+                                text = group.header,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+
+                        // Sessions in this group
+                        items(
+                            items = group.sessions,
+                            key = { it.id }
+                        ) { session ->
+                            SessionCard(
+                                session = session,
+                                onClick = {
+                                    navController.navigate(Screen.Session.createRoute(session.id))
+                                },
+                                onDelete = {
+                                    viewModel.deleteSession(session.id)
+                                }
+                            )
+                        }
+
+                        // Spacer after group
+                        item {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
                 }
             }
         }
@@ -112,7 +186,8 @@ private fun SessionCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = AppCardDefaults.elevation,
+        shape = AppCardDefaults.shape
     ) {
         Row(
             modifier = Modifier

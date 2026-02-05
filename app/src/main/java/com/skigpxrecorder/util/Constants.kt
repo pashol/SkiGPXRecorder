@@ -28,6 +28,9 @@ object Constants {
     const val GPX_FILE_EXTENSION = ".gpx"
     const val TEMP_GPX_FILE_NAME = "temp_recording.gpx"
 
+    // FIT Import
+    const val FIT_MIME_TYPE = "application/vnd.ant.fit"
+
     // FileProvider authority
     const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".fileprovider"
 

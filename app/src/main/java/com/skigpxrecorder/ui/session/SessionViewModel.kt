@@ -1,5 +1,8 @@
 package com.skigpxrecorder.ui.session
 
+import android.content.Context
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.skigpxrecorder.data.local.SessionDao
@@ -10,6 +13,7 @@ import com.skigpxrecorder.data.model.GPXData
 import com.skigpxrecorder.data.model.SessionMetadata
 import com.skigpxrecorder.data.repository.GpxRepository
 import com.skigpxrecorder.domain.SessionAnalyzer
+import com.skigpxrecorder.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +33,13 @@ class SessionViewModel @Inject constructor(
     private val gpxRepository: GpxRepository
 ) : ViewModel() {
 
+    sealed class ExportState {
+        object Idle : ExportState()
+        object Loading : ExportState()
+        data class Success(val uri: Uri) : ExportState()
+        data class Error(val message: String) : ExportState()
+    }
+
     private val _gpxData = MutableStateFlow<GPXData?>(null)
     val gpxData: StateFlow<GPXData?> = _gpxData.asStateFlow()
 
@@ -37,6 +48,9 @@ class SessionViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+    val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
 
     /**
      * Load session data from database or live repository
@@ -138,5 +152,41 @@ class SessionViewModel @Inject constructor(
         val currentIndex = _selectedRunIndex.value ?: 0
         val prevIndex = (currentIndex - 1).coerceAtLeast(0)
         _selectedRunIndex.value = prevIndex
+    }
+
+    /**
+     * Export current session as GPX file for sharing
+     */
+    fun exportSession(context: Context) {
+        val sessionId = _gpxData.value?.metadata?.sessionId ?: return
+
+        viewModelScope.launch {
+            _exportState.value = ExportState.Loading
+            try {
+                val file = gpxRepository.exportSessionAsGpx(sessionId)
+                if (file != null) {
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}${Constants.FILE_PROVIDER_AUTHORITY_SUFFIX}",
+                        file
+                    )
+                    _exportState.value = ExportState.Success(uri)
+                    android.util.Log.d("SessionViewModel", "Export successful: $uri")
+                } else {
+                    _exportState.value = ExportState.Error("Failed to generate GPX file")
+                    android.util.Log.e("SessionViewModel", "Export failed: file is null")
+                }
+            } catch (e: Exception) {
+                _exportState.value = ExportState.Error(e.message ?: "Unknown error")
+                android.util.Log.e("SessionViewModel", "Export exception", e)
+            }
+        }
+    }
+
+    /**
+     * Reset export state to Idle
+     */
+    fun resetExportState() {
+        _exportState.value = ExportState.Idle
     }
 }

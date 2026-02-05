@@ -451,4 +451,49 @@ class GpxRepository @Inject constructor(
             isLive = false
         ).copy(runs = runs)
     }
+
+    /**
+     * Get track points for a specific session (for analytics)
+     */
+    suspend fun getTrackPoints(sessionId: String): List<TrackPoint> = withContext(Dispatchers.IO) {
+        trackPointDao.getTrackPointsForSession(sessionId).map { it.toTrackPoint() }
+    }
+
+    /**
+     * Get runs for a specific session (for analytics)
+     */
+    suspend fun getRunsForSession(sessionId: String): List<SkiRun> = withContext(Dispatchers.IO) {
+        skiRunDao.getRunsForSession(sessionId).map { it.toSkiRun() }
+    }
+
+    /**
+     * Export a historical session as GPX file for sharing
+     */
+    suspend fun exportSessionAsGpx(sessionId: String): File? = withContext(Dispatchers.IO) {
+        try {
+            val session = sessionDao.getSessionById(sessionId) ?: return@withContext null
+            val trackPointEntities = trackPointDao.getTrackPointsForSession(sessionId)
+            val trackPoints = trackPointEntities.map { it.toTrackPoint() }
+
+            if (trackPoints.isEmpty()) {
+                return@withContext null
+            }
+
+            val trackName = session.sessionName ?: "Ski_Track_${sessionId.take(8)}"
+            val gpxContent = GpxWriter.generateGpx(trackPoints, trackName)
+
+            val cacheDir = File(context.cacheDir, Constants.GPX_CACHE_DIR).apply {
+                if (!exists()) mkdirs()
+            }
+
+            val file = File(cacheDir, "$trackName${Constants.GPX_FILE_EXTENSION}")
+            file.writeText(gpxContent)
+
+            android.util.Log.d("GpxRepository", "Exported session $sessionId to ${file.absolutePath}")
+            return@withContext file
+        } catch (e: Exception) {
+            android.util.Log.e("GpxRepository", "Error exporting session: ${e.message}", e)
+            return@withContext null
+        }
+    }
 }
