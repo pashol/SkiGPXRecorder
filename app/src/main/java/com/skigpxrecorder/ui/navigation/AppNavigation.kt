@@ -23,6 +23,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.skigpxrecorder.ui.RecordingScreen
 import com.skigpxrecorder.ui.RecordingViewModel
+import com.skigpxrecorder.ui.highscore.HighscoreScreen
+import com.skigpxrecorder.ui.history.MapAllSessionsScreen
 import com.skigpxrecorder.ui.history.SessionHistoryScreen
 import com.skigpxrecorder.ui.session.SessionScreen
 import com.skigpxrecorder.ui.session.rundetail.RunDetailScreen
@@ -33,6 +35,7 @@ import com.skigpxrecorder.ui.session.rundetail.RunDetailScreen
 sealed class Screen(val route: String) {
     object Start : Screen("start")
     object SessionHistory : Screen("session_history")
+    object MapAllSessions : Screen("map_all_sessions")
     object Highscore : Screen("highscore")
     object Settings : Screen("settings")
 
@@ -106,46 +109,16 @@ fun AppNavigation(
             )
         }
 
+        composable(Screen.MapAllSessions.route) {
+            MapAllSessionsScreen(navController = navController)
+        }
+
         composable(Screen.Highscore.route) {
-            // Placeholder for Highscore screen (Phase 4)
-            HighscorePlaceholder(navController = navController)
+            HighscoreScreen(navController = navController)
         }
 
         composable(Screen.Settings.route) {
             com.skigpxrecorder.ui.settings.SettingsScreen(navController = navController)
-        }
-    }
-}
-
-/**
- * Placeholder screen for Highscore feature (to be implemented in Phase 4)
- */
-@Composable
-private fun HighscorePlaceholder(navController: NavController) {
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        androidx.compose.foundation.layout.Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
-        ) {
-            androidx.compose.material3.Icon(
-                imageVector = Icons.Default.Star,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            androidx.compose.material3.Text(
-                text = "HIGHSCORE",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            androidx.compose.material3.Text(
-                text = "Coming in Phase 4",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

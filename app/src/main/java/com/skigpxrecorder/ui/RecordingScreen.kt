@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +47,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.skigpxrecorder.R
+import com.skigpxrecorder.ui.components.StartScreenTopBar
+import com.skigpxrecorder.ui.components.StatCircle
 import com.skigpxrecorder.ui.theme.GreenSuccess
 import com.skigpxrecorder.ui.theme.RedError
 
@@ -63,12 +67,24 @@ fun RecordingScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
+            // Top bar with GPS indicator and menu
+            StartScreenTopBar(
+                gpsAccuracy = uiState.gpsAccuracy,
+                onSettingsClick = { /* TODO: Navigate to settings */ },
+                onAboutClick = { /* TODO: Show about dialog */ },
+                onVersionClick = { /* TODO: Show version dialog */ }
+            )
+
+            // Scrollable content below top bar
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 // Status Card
                 StatusCard(uiState)
 
@@ -91,6 +107,7 @@ fun RecordingScreen(
                         onShareClick = { viewModel.shareGpxFile() },
                         onSaveClick = { viewModel.saveToDownloads() }
                     )
+                }
             }
         }
 
@@ -201,57 +218,63 @@ private fun RecordingStats(uiState: RecordingUiState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Primary stats row
+            // Primary stats - Circular display (2x2 grid)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                StatItem(
-                    label = stringResource(R.string.current_speed),
+                StatCircle(
                     value = "%.1f".format(uiState.currentSpeed),
                     unit = stringResource(R.string.km_h),
-                    highlight = true
+                    label = stringResource(R.string.current_speed),
+                    progress = (uiState.currentSpeed / 80f).coerceIn(0f, 1f), // Assume max 80 km/h
+                    size = 100.dp
                 )
-                StatItem(
+                StatCircle(
+                    value = "%.0f".format(uiState.distance / 1000), // Convert to km
+                    unit = "km",
                     label = stringResource(R.string.distance),
-                    value = "%.0f".format(uiState.distance),
-                    unit = stringResource(R.string.meters)
+                    progress = (uiState.distance / 10000f).coerceIn(0f, 1f), // Assume max 10km per session
+                    size = 100.dp
                 )
             }
-            
-            // Secondary stats
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatCircle(
+                    value = "%.0f".format(uiState.currentElevation),
+                    unit = "m",
+                    label = stringResource(R.string.elevation),
+                    progress = (uiState.currentElevation / 3000f).coerceIn(0f, 1f), // Assume max 3000m
+                    size = 100.dp
+                )
+                StatCircle(
+                    value = "%.1f".format(uiState.maxSpeed),
+                    unit = stringResource(R.string.km_h),
+                    label = stringResource(R.string.max_speed),
+                    progress = (uiState.maxSpeed / 80f).coerceIn(0f, 1f), // Assume max 80 km/h
+                    size = 100.dp
+                )
+            }
+
+            // Secondary stats - Traditional text display
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 StatItem(
-                    label = stringResource(R.string.elevation),
-                    value = "%.0f".format(uiState.currentElevation),
-                    unit = stringResource(R.string.meters)
+                    label = stringResource(R.string.avg_speed),
+                    value = "%.1f".format(uiState.avgSpeed),
+                    unit = stringResource(R.string.km_h)
                 )
                 StatItem(
                     label = stringResource(R.string.gps_accuracy),
                     value = "%.0f".format(uiState.gpsAccuracy),
                     unit = stringResource(R.string.meters)
-                )
-            }
-            
-            // More stats
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(
-                    label = stringResource(R.string.max_speed),
-                    value = "%.1f".format(uiState.maxSpeed),
-                    unit = stringResource(R.string.km_h)
-                )
-                StatItem(
-                    label = stringResource(R.string.avg_speed),
-                    value = "%.1f".format(uiState.avgSpeed),
-                    unit = stringResource(R.string.km_h)
                 )
             }
             
