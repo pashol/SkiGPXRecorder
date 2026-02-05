@@ -38,7 +38,7 @@ class FileImporter @Inject constructor(
 
             when (fileType) {
                 FileType.GPX -> importGpxFile(inputStream, fileName)
-                FileType.FIT -> ImportResult.Error("FIT file import not yet supported")
+                FileType.FIT -> importFitFile(inputStream, fileName)
                 FileType.UNKNOWN -> ImportResult.Error("Unsupported file type")
             }
         } catch (e: Exception) {
@@ -76,6 +76,39 @@ class FileImporter @Inject constructor(
             ImportResult.Success(gpxData)
         } catch (e: Exception) {
             ImportResult.Error("GPX parsing failed: ${e.message}")
+        }
+    }
+
+    private suspend fun importFitFile(
+        inputStream: InputStream,
+        fileName: String
+    ): ImportResult {
+        return try {
+            val parseResult = FitParser.parse(inputStream)
+
+            if (parseResult.trackPoints.isEmpty()) {
+                return ImportResult.Error("No track points found in FIT file")
+            }
+
+            // Use metadata name if available, otherwise use filename
+            val sessionName = parseResult.metadata.name
+                ?: fileName.removeSuffix(".fit")
+
+            // Analyze the session
+            val sessionId = "imported_${System.currentTimeMillis()}"
+            val gpxData = sessionAnalyzer.analyzeSession(
+                sessionId = sessionId,
+                sessionName = sessionName,
+                points = parseResult.trackPoints,
+                source = DataSource.IMPORTED_FIT,
+                isLive = false
+            )
+            android.util.Log.d("FileImporter", "Saving FIT session to database: ${gpxData.metadata.sessionId}")
+            gpxRepository.createImportedSession(gpxData, fileName)
+            android.util.Log.d("FileImporter", "FIT session saved successfully")
+            ImportResult.Success(gpxData)
+        } catch (e: Exception) {
+            ImportResult.Error("FIT parsing failed: ${e.message}")
         }
     }
 

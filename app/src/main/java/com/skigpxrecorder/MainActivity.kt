@@ -6,13 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.DrawerValue
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,13 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.skigpxrecorder.ui.RecordingScreen
 import com.skigpxrecorder.domain.FileImporter
 import com.skigpxrecorder.ui.RecordingViewModel
 import com.skigpxrecorder.ui.import.FileImportHandler
-import com.skigpxrecorder.ui.navigation.AppDrawer
 import com.skigpxrecorder.ui.navigation.AppNavigation
+import com.skigpxrecorder.ui.navigation.BottomNavBar
 import com.skigpxrecorder.ui.navigation.Screen
 import com.skigpxrecorder.ui.theme.SkiGPXRecorderTheme
 import com.skigpxrecorder.util.PermissionHelper
@@ -71,10 +71,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             SkiGPXRecorderTheme {
                 val navController = rememberNavController()
-                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 val snackbarHostState = remember { SnackbarHostState() }
                 var triggerFileImport by remember { mutableStateOf(false) }
+
+                // Get current route for bottom nav
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
 
                 // File import handler
                 FileImportHandler(
@@ -94,27 +97,35 @@ class MainActivity : ComponentActivity() {
                     onTriggerConsumed = { triggerFileImport = false }
                 )
 
-                ModalNavigationDrawer(
-                    drawerState = drawerState,
-                    drawerContent = {
-                        AppDrawer(
-                            navController = navController,
-                            drawerState = drawerState,
-                            scope = scope,
-                            onOpenFile = { triggerFileImport = true }
-                        )
-                    }
-                ) {
+                // Determine if bottom nav should be shown
+                val showBottomNav = currentRoute in listOf(
+                    "start",
+                    "session_history",
+                    "highscore"
+                )
+
+                Scaffold(
+                    bottomBar = {
+                        if (showBottomNav) {
+                            BottomNavBar(
+                                currentRoute = currentRoute,
+                                navController = navController
+                            )
+                        }
+                    },
+                    snackbarHost = { SnackbarHost(snackbarHostState) }
+                ) { paddingValues ->
                     Surface(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
                         color = MaterialTheme.colorScheme.background
                     ) {
                         AppNavigation(
                             navController = navController,
-                            drawerState = drawerState,
-                            scope = scope,
                             recordingViewModel = viewModel,
-                            onRequestPermission = { checkAndRequestPermissions() }
+                            onRequestPermission = { checkAndRequestPermissions() },
+                            onOpenFile = { triggerFileImport = true }
                         )
                     }
                 }

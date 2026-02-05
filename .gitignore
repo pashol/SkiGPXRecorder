@@ -62,3 +62,6 @@ obj/
 # Misc
 nul
 ui/
+
+# Git worktrees
+.worktrees/

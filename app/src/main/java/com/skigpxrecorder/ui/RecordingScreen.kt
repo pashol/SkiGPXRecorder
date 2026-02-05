@@ -22,28 +22,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,57 +53,22 @@ import com.skigpxrecorder.ui.theme.RedError
 fun RecordingScreen(
     viewModel: RecordingViewModel,
     navController: NavController? = null,
-    drawerState: DrawerState? = null,
-    scope: CoroutineScope? = null,
     onRequestPermission: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val localScope = scope ?: rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
-                navigationIcon = {
-                    drawerState?.let { drawer ->
-                        IconButton(onClick = {
-                            localScope.launch {
-                                drawer.open()
-                            }
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Box(
+    // Main content without Scaffold - bottom nav is in MainActivity
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
                 // Status Card
                 StatusCard(uiState)
 
@@ -137,53 +91,52 @@ fun RecordingScreen(
                         onShareClick = { viewModel.shareGpxFile() },
                         onSaveClick = { viewModel.saveToDownloads() }
                     )
+            }
+        }
+
+        // Dialogs
+        if (uiState.showPermissionDenied) {
+            PermissionDeniedDialog(
+                onDismiss = { viewModel.dismissPermissionDenied() },
+                onOpenSettings = {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = android.net.Uri.parse("package:${context.packageName}")
+                    }
+                    context.startActivity(intent)
                 }
-            }
+            )
+        }
 
-            // Dialogs
-            if (uiState.showPermissionDenied) {
-                PermissionDeniedDialog(
-                    onDismiss = { viewModel.dismissPermissionDenied() },
-                    onOpenSettings = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = android.net.Uri.parse("package:${context.packageName}")
-                        }
-                        context.startActivity(intent)
-                    }
-                )
-            }
+        if (uiState.showResumeDialog) {
+            ResumeRecordingDialog(
+                onResume = { viewModel.onResumeSessionConfirmed() },
+                onDiscard = { viewModel.onDiscardSession() }
+            )
+        }
 
-            if (uiState.showResumeDialog) {
-                ResumeRecordingDialog(
-                    onResume = { viewModel.onResumeSessionConfirmed() },
-                    onDiscard = { viewModel.onDiscardSession() }
-                )
-            }
+        if (uiState.batteryWarning) {
+            BatteryWarningDialog(
+                onDismiss = { viewModel.dismissBatteryWarning() }
+            )
+        }
 
-            if (uiState.batteryWarning) {
-                BatteryWarningDialog(
-                    onDismiss = { viewModel.dismissBatteryWarning() }
-                )
-            }
-
-            if (uiState.showSaveSuccess) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.TopCenter
+        if (uiState.showSaveSuccess) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = GreenSuccess
+                    )
                 ) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = GreenSuccess
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(R.string.recording_saved),
-                            modifier = Modifier.padding(16.dp),
-                            color = Color.White
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.recording_saved),
+                        modifier = Modifier.padding(16.dp),
+                        color = Color.White
+                    )
                 }
             }
         }
