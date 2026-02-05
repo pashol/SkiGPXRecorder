@@ -3,6 +3,9 @@ package com.skigpxrecorder.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CardElevation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -10,9 +13,11 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
@@ -59,4 +64,22 @@ fun SkiGPXRecorderTheme(
         typography = Typography,
         content = content
     )
+}
+
+/**
+ * Standardized card styling defaults for consistent appearance across the app
+ */
+object AppCardDefaults {
+    /**
+     * Default elevation for cards (4.dp)
+     */
+    val elevation: CardElevation
+        @Composable
+        get() = CardDefaults.cardElevation(defaultElevation = 4.dp)
+
+    /**
+     * Default shape for cards (12.dp rounded corners)
+     */
+    val shape: Shape
+        get() = RoundedCornerShape(12.dp)
 }
