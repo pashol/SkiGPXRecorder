@@ -102,7 +102,7 @@ fun HoldToStopButton(
 
         if (isHolding && animatedProgress > 0f) {
             LinearProgressIndicator(
-                progress = animatedProgress,
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter),

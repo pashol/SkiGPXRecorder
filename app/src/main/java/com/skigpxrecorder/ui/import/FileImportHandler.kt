@@ -1,5 +1,6 @@
 package com.skigpxrecorder.ui.import
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import com.skigpxrecorder.domain.FileImporter
 import com.skigpxrecorder.util.Constants
 import kotlinx.coroutines.launch
@@ -25,12 +27,33 @@ fun FileImportHandler(
     trigger: Boolean = false,
     onTriggerConsumed: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri: Uri? ->
+            android.util.Log.d("FileImportHandler", "File picker returned URI: $uri")
+            if (uri != null) {
+                android.util.Log.d("FileImportHandler", "URI details - scheme: ${uri.scheme}, authority: ${uri.authority}, path: ${uri.path}")
+
+                // Grant read permission for this URI
+                // This ensures we can access the file even if it's from a cloud provider
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                    android.util.Log.d("FileImportHandler", "Took persistable URI permission")
+                } catch (e: SecurityException) {
+                    // Persistable permission not available (e.g., from some cloud providers)
+                    // This is OK - we still have temporary permission
+                    android.util.Log.d("FileImportHandler", "Could not take persistable permission (this is normal for some providers): ${e.message}")
+                }
+            } else {
+                android.util.Log.d("FileImportHandler", "File picker returned null (user cancelled)")
+            }
             selectedUri = uri
         }
     )
@@ -38,14 +61,10 @@ fun FileImportHandler(
     // Launch file picker when trigger is true
     LaunchedEffect(trigger) {
         if (trigger) {
-            filePickerLauncher.launch(
-                arrayOf(
-                    "application/gpx+xml",
-                    Constants.FIT_MIME_TYPE,
-                    "application/octet-stream",
-                    "*/*"
-                )
-            )
+            android.util.Log.d("FileImportHandler", "Launching file picker")
+            // Use "*/*" to allow all files, then we'll validate based on file extension
+            // This is more reliable than specific MIME types which vary by provider
+            filePickerLauncher.launch(arrayOf("*/*"))
             onTriggerConsumed()
         }
     }

@@ -14,9 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +58,7 @@ fun AppDrawer(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Divider()
+            HorizontalDivider()
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -79,7 +79,7 @@ fun AppDrawer(
             )
 
             DrawerItem(
-                icon = Icons.Default.List,
+                icon = Icons.AutoMirrored.Filled.List,
                 label = "Session History",
                 onClick = {
                     scope.launch {
@@ -113,7 +113,7 @@ fun AppDrawer(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Divider()
+            HorizontalDivider()
 
             Spacer(modifier = Modifier.height(8.dp))
 
