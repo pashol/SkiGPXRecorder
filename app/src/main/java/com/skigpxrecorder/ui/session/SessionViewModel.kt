@@ -107,9 +107,21 @@ class SessionViewModel @Inject constructor(
      * Load completed session from database
      */
     private suspend fun loadHistoricalSession(sessionId: String) {
-        val session = sessionDao.getSessionById(sessionId) ?: return
+        val session = sessionDao.getSessionById(sessionId)
+        if (session == null) {
+            android.util.Log.e("SessionViewModel", "Session not found: $sessionId")
+            _gpxData.value = null
+            return
+        }
+
         val trackPointEntities = trackPointDao.getTrackPointsForSession(sessionId)
         val skiRunEntities = skiRunDao.getRunsForSession(sessionId)
+
+        if (trackPointEntities.isEmpty()) {
+            android.util.Log.e("SessionViewModel", "No track points found for session: $sessionId")
+            _gpxData.value = null
+            return
+        }
 
         val points = trackPointEntities.map { it.toTrackPoint() }
         val runs = skiRunEntities.map { it.toSkiRun() }
@@ -118,9 +130,14 @@ class SessionViewModel @Inject constructor(
             sessionId = sessionId,
             sessionName = session.sessionName ?: "Ski Session",
             points = points,
-            source = DataSource.valueOf(session.source),
+            source = try {
+                DataSource.valueOf(session.source)
+            } catch (e: IllegalArgumentException) {
+                android.util.Log.w("SessionViewModel", "Invalid source: ${session.source}, defaulting to RECORDED")
+                DataSource.RECORDED
+            },
             isLive = false,
-            existingRuns = runs
+            existingRuns = runs.ifEmpty { null }
         )
 
         _gpxData.value = gpxData

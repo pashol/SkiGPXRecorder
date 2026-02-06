@@ -31,7 +31,9 @@ data class SessionGroup(
 @HiltViewModel
 class SessionHistoryViewModel @Inject constructor(
     private val gpxRepository: GpxRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val geocodingService: com.skigpxrecorder.domain.GeocodingService,
+    private val trackPointDao: com.skigpxrecorder.data.local.TrackPointDao
 ) : ViewModel() {
 
     /**
@@ -56,12 +58,19 @@ class SessionHistoryViewModel @Inject constructor(
         )
 
     /**
+     * Cache for session locations to avoid repeated geocoding
+     */
+    private val locationCache = mutableMapOf<String, String>()
+    private val _locationCacheUpdates = MutableStateFlow(0)
+
+    /**
      * Grouped sessions based on current grouping mode
      */
     val groupedSessions: StateFlow<List<SessionGroup>> = combine(
         sessions,
-        groupingMode
-    ) { sessionList, mode ->
+        groupingMode,
+        _locationCacheUpdates
+    ) { sessionList, mode, _ ->
         when (mode) {
             UserPreferences.HistoryGrouping.DATE -> groupByDate(sessionList)
             UserPreferences.HistoryGrouping.LOCATION -> groupByLocation(sessionList)
@@ -112,14 +121,24 @@ class SessionHistoryViewModel @Inject constructor(
      * Group sessions by location (using reverse geocoding)
      */
     private fun groupByLocation(sessions: List<RecordingSession>): List<SessionGroup> {
-        // Group by approximate location using elevation (placeholder)
-        // Full implementation would use geocoding for each session
+        // Trigger geocoding for sessions without cached locations
+        sessions.forEach { session ->
+            if (!locationCache.containsKey(session.id)) {
+                viewModelScope.launch {
+                    getLocationForSession(session.id)
+                }
+            }
+        }
+
+        // Group by cached location names
         return sessions
             .sortedByDescending { it.startTime }
             .groupBy { session ->
-                // For now, group by elevation range as a simple placeholder
-                val elevRange = (session.elevationGain / 100).toInt() * 100
-                "Location (~${elevRange}m elevation)"
+                locationCache[session.id] ?: "Loading location..."
+            }
+            .filter { (location, _) ->
+                // Filter out "Loading..." groups if they're empty
+                location != "Loading location..." || _locationCacheUpdates.value > 0
             }
             .map { (location, sessionList) ->
                 SessionGroup(
@@ -127,5 +146,31 @@ class SessionHistoryViewModel @Inject constructor(
                     sessions = sessionList
                 )
             }
+    }
+
+    /**
+     * Get location name for a session using reverse geocoding
+     */
+    private suspend fun getLocationForSession(sessionId: String) {
+        try {
+            // Get first track point for this session
+            val trackPoints = trackPointDao.getTrackPointsForSession(sessionId)
+            if (trackPoints.isNotEmpty()) {
+                val firstPoint = trackPoints.first()
+                val locationName = geocodingService.getLocationName(
+                    latitude = firstPoint.latitude,
+                    longitude = firstPoint.longitude
+                )
+                locationCache[sessionId] = locationName
+                _locationCacheUpdates.value += 1
+            } else {
+                locationCache[sessionId] = "Unknown Location"
+                _locationCacheUpdates.value += 1
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SessionHistoryViewModel", "Failed to geocode session $sessionId", e)
+            locationCache[sessionId] = "Unknown Location"
+            _locationCacheUpdates.value += 1
+        }
     }
 }
