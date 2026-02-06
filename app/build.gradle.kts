@@ -4,6 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.kapt")
     id("com.google.dagger.hilt.android")
+    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
 }
 
 android {
@@ -84,6 +85,10 @@ dependencies {
     // Google Play Services - Location
     implementation("com.google.android.gms:play-services-location:21.0.1")
 
+    // Google Maps
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
@@ -122,4 +127,9 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+secrets {
+    propertiesFileName = "secrets.properties"
+    defaultPropertiesFileName = "local.defaults.properties"
 }

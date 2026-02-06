@@ -4,6 +4,7 @@
     <!-- Recording Screen -->
     <string name="start_recording">Start Recording</string>
     <string name="stop_recording">Stop Recording</string>
+    <string name="hold_to_stop">Hold to Stop…</string>
     <string name="recording_in_progress">Recording in Progress</string>
     <string name="ready_to_record">Ready to Record</string>
     
