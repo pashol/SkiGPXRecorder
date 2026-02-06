@@ -2,10 +2,10 @@ package com.skigpxrecorder.ui.charts
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -23,23 +22,40 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.skigpxrecorder.data.model.TrackPoint
+import com.skigpxrecorder.domain.StatsCalculator
 import com.skigpxrecorder.ui.charts.ChartUtils.drawGrid
+import com.skigpxrecorder.ui.charts.ChartUtils.drawTooltip
 import com.skigpxrecorder.ui.charts.ChartUtils.drawYAxis
 import com.skigpxrecorder.ui.charts.ChartUtils.mapToScreen
 
 /**
  * Dual-axis chart showing elevation profile and speed overlay
+ * with interactive tooltip and point selection callback
  */
 @Composable
 fun ElevationSpeedChart(
     trackPoints: List<TrackPoint>,
     showSpeed: Boolean = true,
     xAxisMode: XAxisMode = XAxisMode.DISTANCE,
+    onPointSelected: ((Int?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var touchedIndex by remember { mutableStateOf<Int?>(null) }
 
+    // Precompute cumulative distances for tooltip display
+    val cumulativeDistances = remember(trackPoints) {
+        if (trackPoints.isEmpty()) return@remember floatArrayOf()
+        val distances = FloatArray(trackPoints.size)
+        distances[0] = 0f
+        for (i in 1 until trackPoints.size) {
+            distances[i] = distances[i - 1] +
+                    StatsCalculator.calculateDistance(trackPoints[i - 1], trackPoints[i]).toFloat()
+        }
+        distances
+    }
+
     val elevationColor = Color(0xFF1976D2) // Material Blue
+    val speedAxisColor = Color(0xFF4CAF50) // Green for speed axis
     val elevationGradient = ChartUtils.elevationGradient()
 
     Canvas(
@@ -48,13 +64,42 @@ fun ElevationSpeedChart(
             .height(300.dp)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
-                    // Find closest point to touch
                     val chartWidth = size.width - 100f
-                    val pointWidth = chartWidth / trackPoints.size.coerceAtLeast(1)
-                    val index = ((offset.x - 50f) / pointWidth).toInt()
-                        .coerceIn(0, trackPoints.size - 1)
+                    val index = ChartUtils.findNearestPointIndex(
+                        offset.x, 50f, chartWidth, trackPoints.size
+                    )
                     touchedIndex = index
+                    onPointSelected?.invoke(index)
                 }
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val chartWidth = size.width - 100f
+                        val index = ChartUtils.findNearestPointIndex(
+                            offset.x, 50f, chartWidth, trackPoints.size
+                        )
+                        touchedIndex = index
+                        onPointSelected?.invoke(index)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val chartWidth = size.width - 100f
+                        val index = ChartUtils.findNearestPointIndex(
+                            change.position.x, 50f, chartWidth, trackPoints.size
+                        )
+                        touchedIndex = index
+                        onPointSelected?.invoke(index)
+                    },
+                    onDragEnd = {
+                        touchedIndex = null
+                        onPointSelected?.invoke(null)
+                    },
+                    onDragCancel = {
+                        touchedIndex = null
+                        onPointSelected?.invoke(null)
+                    }
+                )
             }
     ) {
         if (trackPoints.isEmpty()) return@Canvas
@@ -186,19 +231,19 @@ fun ElevationSpeedChart(
                         minValue = 0f,
                         maxValue = maxSpeed,
                         divisions = 5,
-                        labelColor = Color(0xFF4CAF50), // Green for speed axis
+                        labelColor = speedAxisColor,
                         formatLabel = { "${it.toInt()} km/h" }
                     )
                 }
             }
         }
 
-        // Draw touched point indicator
+        // Draw touched point indicator with tooltip
         touchedIndex?.let { index ->
             if (index in trackPoints.indices) {
                 val x = padding + (index.toFloat() / trackPoints.size) * chartWidth
                 val point = trackPoints[index]
-                val y = mapToScreen(
+                val elevY = mapToScreen(
                     point.elevation.toFloat(),
                     minElevation,
                     maxElevation,
@@ -206,7 +251,7 @@ fun ElevationSpeedChart(
                     padding
                 )
 
-                // Draw vertical line
+                // Draw vertical guideline
                 drawLine(
                     color = Color.Gray.copy(alpha = 0.5f),
                     start = Offset(x, padding),
@@ -214,11 +259,49 @@ fun ElevationSpeedChart(
                     strokeWidth = 2f
                 )
 
-                // Draw tooltip circle
+                // Draw elevation indicator circle
                 drawCircle(
                     color = elevationColor,
                     radius = 8f,
-                    center = Offset(x, y)
+                    center = Offset(x, elevY)
+                )
+
+                // Draw speed indicator circle if speed is shown
+                if (showSpeed) {
+                    val speedY = mapToScreen(
+                        point.speed,
+                        0f,
+                        maxSpeed,
+                        height - padding,
+                        padding
+                    )
+                    val normalized = (point.speed / maxSpeed).coerceIn(0f, 1f)
+                    drawCircle(
+                        color = ChartUtils.getSpeedColor(normalized),
+                        radius = 8f,
+                        center = Offset(x, speedY)
+                    )
+                }
+
+                // Build tooltip lines
+                val tooltipLines = mutableListOf<Pair<String, Color>>()
+                tooltipLines.add(
+                    "${point.elevation.toInt()} m" to Color(0xFF90CAF9) // Light blue
+                )
+                tooltipLines.add(
+                    String.format("%.1f km/h", point.speed) to Color(0xFFA5D6A7) // Light green
+                )
+                if (cumulativeDistances.isNotEmpty() && index < cumulativeDistances.size) {
+                    tooltipLines.add(
+                        ChartUtils.formatDistance(cumulativeDistances[index]) to Color.White
+                    )
+                }
+
+                // Draw tooltip
+                drawTooltip(
+                    x = x,
+                    y = elevY,
+                    lines = tooltipLines
                 )
             }
         }

@@ -25,6 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -40,7 +43,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Detailed view of a single ski run
+ * Detailed view of a single ski run with map, charts, and stats
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +57,9 @@ fun RunDetailScreen(
     val runPoints by viewModel.runPoints.collectAsState()
     val allRuns by viewModel.allRuns.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+
+    // Shared state: selected point index connecting chart touch to map marker
+    var selectedPointIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(sessionId, runNumber) {
         viewModel.loadRun(sessionId, runNumber)
@@ -89,12 +95,29 @@ fun RunDetailScreen(
                     )
                 }
                 else -> {
-                    RunDetailContent(
-                        run = run!!,
-                        runPoints = runPoints,
-                        allRuns = allRuns,
-                        unitSystem = UserPreferences.UnitSystem.METRIC
-                    )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Fixed map at top
+                        if (runPoints.isNotEmpty()) {
+                            RunMapView(
+                                trackPoints = runPoints,
+                                runNumber = runNumber,
+                                highlightedPointIndex = selectedPointIndex,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                            )
+                        }
+
+                        // Scrollable content below the map
+                        RunDetailContent(
+                            run = run!!,
+                            runPoints = runPoints,
+                            allRuns = allRuns,
+                            unitSystem = UserPreferences.UnitSystem.METRIC,
+                            onPointSelected = { index -> selectedPointIndex = index },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
@@ -106,10 +129,12 @@ private fun RunDetailContent(
     run: com.skigpxrecorder.data.model.SkiRun,
     runPoints: List<com.skigpxrecorder.data.model.TrackPoint>,
     allRuns: List<com.skigpxrecorder.data.model.SkiRun>,
-    unitSystem: UserPreferences.UnitSystem
+    unitSystem: UserPreferences.UnitSystem,
+    onPointSelected: (Int?) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -229,7 +254,8 @@ private fun RunDetailContent(
             item {
                 ElevationSpeedChart(
                     trackPoints = runPoints,
-                    showSpeed = true
+                    showSpeed = true,
+                    onPointSelected = onPointSelected
                 )
             }
 

@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import android.graphics.Paint
+import androidx.compose.ui.geometry.CornerRadius
 import kotlin.math.roundToInt
 
 /**
@@ -246,5 +247,77 @@ object ChartUtils {
         val mins = seconds / 60
         val secs = seconds % 60
         return String.format("%d:%02d", mins, secs)
+    }
+
+    /**
+     * Find nearest data point index for a given touch X position on the chart
+     */
+    fun findNearestPointIndex(
+        touchX: Float,
+        padding: Float,
+        chartWidth: Float,
+        pointCount: Int
+    ): Int {
+        if (pointCount <= 0) return 0
+        val relativeX = touchX - padding
+        val index = (relativeX / chartWidth * pointCount).toInt()
+        return index.coerceIn(0, pointCount - 1)
+    }
+
+    /**
+     * Draw a floating tooltip box with multiple lines of text
+     */
+    fun DrawScope.drawTooltip(
+        x: Float,
+        y: Float,
+        lines: List<Pair<String, Color>>,
+        backgroundColor: Color = Color(0xEE2D2D2D),
+        padding: Float = 12f,
+        lineHeight: Float = 36f,
+        cornerRadius: Float = 12f
+    ) {
+        val textPaint = Paint().apply {
+            textSize = 28f
+            isAntiAlias = true
+        }
+
+        // Measure text widths to size the box
+        val maxTextWidth = lines.maxOf { (text, _) ->
+            textPaint.apply { color = Color.White.toArgb() }
+            textPaint.measureText(text)
+        }
+
+        val boxWidth = maxTextWidth + padding * 2
+        val boxHeight = lines.size * lineHeight + padding * 2
+
+        // Position: prefer above the touch point, flip below if near top
+        val boxX = (x - boxWidth / 2).coerceIn(0f, size.width - boxWidth)
+        val boxY = if (y - boxHeight - 20f > 0f) {
+            y - boxHeight - 20f
+        } else {
+            y + 20f
+        }
+
+        // Draw rounded rectangle background
+        drawRoundRect(
+            color = backgroundColor,
+            topLeft = Offset(boxX, boxY),
+            size = androidx.compose.ui.geometry.Size(boxWidth, boxHeight),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+        )
+
+        // Draw text lines
+        lines.forEachIndexed { index, (text, textColor) ->
+            drawContext.canvas.nativeCanvas.drawText(
+                text,
+                boxX + padding,
+                boxY + padding + (index + 1) * lineHeight - 8f,
+                Paint().apply {
+                    color = textColor.toArgb()
+                    textSize = 28f
+                    isAntiAlias = true
+                }
+            )
+        }
     }
 }
