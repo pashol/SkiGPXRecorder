@@ -61,5 +61,6 @@ data class RecordingSession(
     val elevationLoss: Float = 0f,
     val maxSpeed: Float = 0f,
     val runsCount: Int = 0,
-    val source: String = "RECORDED" // DataSource enum as string
+    val source: String = "RECORDED", // DataSource enum as string
+    val location: String? = null // Geocoded location (e.g., "Zermatt, Switzerland")
 )

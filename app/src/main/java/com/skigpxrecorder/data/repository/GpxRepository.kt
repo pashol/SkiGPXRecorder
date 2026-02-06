@@ -32,7 +32,8 @@ class GpxRepository @Inject constructor(
     private val sessionDao: SessionDao,
     private val trackPointDao: TrackPointDao,
     private val skiRunDao: SkiRunDao,
-    private val runDetector: RunDetector
+    private val runDetector: RunDetector,
+    private val geocodingService: com.skigpxrecorder.domain.GeocodingService
 ) {
     private val trackPoints = mutableListOf<TrackPoint>()
     private var currentSession: RecordingSession? = null
@@ -244,6 +245,29 @@ class GpxRepository @Inject constructor(
             skiRunDao.insertRuns(skiRunEntities)
         }
 
+        // Geocode location before completing session
+        val location = try {
+            if (pointsSnapshot.isNotEmpty()) {
+                val firstPoint = pointsSnapshot.first()
+                geocodingService.getLocationName(
+                    latitude = firstPoint.latitude,
+                    longitude = firstPoint.longitude
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GpxRepository", "Failed to geocode session location", e)
+            null
+        }
+
+        // Update session with location and mark as inactive
+        val finalSession = session.copy(
+            endTime = System.currentTimeMillis(),
+            runsCount = finalRuns.size,
+            location = location
+        )
+        sessionDao.updateSession(finalSession)
         sessionDao.markSessionInactive(session.id)
 
         getTempGpxFile().delete()
@@ -298,6 +322,22 @@ class GpxRepository @Inject constructor(
         val sessionId = gpxData.metadata.sessionId
         val sessionName = gpxData.metadata.sessionName
 
+        // Geocode location for imported session
+        val location = try {
+            if (gpxData.trackPoints.isNotEmpty()) {
+                val firstPoint = gpxData.trackPoints.first()
+                geocodingService.getLocationName(
+                    latitude = firstPoint.latitude,
+                    longitude = firstPoint.longitude
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GpxRepository", "Failed to geocode imported session location", e)
+            null
+        }
+
         // Create session entity
         val session = RecordingSession(
             id = sessionId,
@@ -314,7 +354,8 @@ class GpxRepository @Inject constructor(
             finalFilePath = null,
             sessionName = sessionName,
             runsCount = gpxData.runs.size,
-            source = com.skigpxrecorder.data.model.DataSource.IMPORTED_GPX.name
+            source = com.skigpxrecorder.data.model.DataSource.IMPORTED_GPX.name,
+            location = location
         )
 
         // Insert session
@@ -436,20 +477,43 @@ class GpxRepository @Inject constructor(
      * Load complete session data as GPXData
      */
     suspend fun loadSessionData(sessionId: String): GPXData? = withContext(Dispatchers.IO) {
-        val session = sessionDao.getSessionById(sessionId) ?: return@withContext null
-        val trackPointEntities = trackPointDao.getTrackPointsForSession(sessionId)
-        val skiRunEntities = skiRunDao.getRunsForSession(sessionId)
+        try {
+            val session = sessionDao.getSessionById(sessionId)
+            if (session == null) {
+                android.util.Log.e("GpxRepository", "Session not found: $sessionId")
+                return@withContext null
+            }
 
-        val points = trackPointEntities.map { it.toTrackPoint() }
-        val runs = skiRunEntities.map { it.toSkiRun() }
+            val trackPointEntities = trackPointDao.getTrackPointsForSession(sessionId)
+            val skiRunEntities = skiRunDao.getRunsForSession(sessionId)
 
-        SessionAnalyzer.analyzeSession(
-            sessionId = sessionId,
-            sessionName = session.sessionName ?: "Ski Session",
-            points = points,
-            source = DataSource.valueOf(session.source),
-            isLive = false
-        ).copy(runs = runs)
+            if (trackPointEntities.isEmpty()) {
+                android.util.Log.e("GpxRepository", "No track points for session: $sessionId")
+                return@withContext null
+            }
+
+            val points = trackPointEntities.map { it.toTrackPoint() }
+            val runs = skiRunEntities.map { it.toSkiRun() }
+
+            val source = try {
+                DataSource.valueOf(session.source)
+            } catch (e: IllegalArgumentException) {
+                android.util.Log.w("GpxRepository", "Invalid source: ${session.source}, defaulting to RECORDED")
+                DataSource.RECORDED
+            }
+
+            SessionAnalyzer.analyzeSession(
+                sessionId = sessionId,
+                sessionName = session.sessionName ?: "Ski Session",
+                points = points,
+                source = source,
+                isLive = false,
+                existingRuns = runs.ifEmpty { null }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("GpxRepository", "Error loading session data: $sessionId", e)
+            null
+        }
     }
 
     /**

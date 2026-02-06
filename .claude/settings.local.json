@@ -66,7 +66,8 @@
       "Bash(git worktree remove:*)",
       "Bash(set \"JAVA_HOME=C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\")",
       "Bash(gradlew assembleDebug:*)",
-      "Bash(del \"C:\\\\Users\\\\pasca\\\\Coding\\\\SkiGPXRecorder\\\\app\\\\src\\\\main\\\\java\\\\com\\\\skigpxrecorder\\\\ui\\\\components\\\\LiveMapView.kt\")"
+      "Bash(del \"C:\\\\Users\\\\pasca\\\\Coding\\\\SkiGPXRecorder\\\\app\\\\src\\\\main\\\\java\\\\com\\\\skigpxrecorder\\\\ui\\\\components\\\\LiveMapView.kt\")",
+      "Bash(./gradlew installDebug:*)"
     ]
   }
 }
