@@ -51,7 +51,10 @@ class RecordingViewModel @Inject constructor(
                         locationFlowJob?.cancel()
                         locationFlowJob = viewModelScope.launch {
                             service.locationFlow.collect { _ ->
-                                // Location updates handled via repository flow
+                                // Update track points in UI state
+                                _uiState.update {
+                                    it.copy(trackPoints = gpxRepository.getTrackPoints())
+                                }
                             }
                         }
 
@@ -171,9 +174,10 @@ class RecordingViewModel @Inject constructor(
     }
 
     fun onDiscardSession() {
+        val sessionId = _uiState.value.interruptedSession?.id
         viewModelScope.launch {
-            gpxRepository.clearCurrentSession()
-            _uiState.update { 
+            gpxRepository.clearCurrentSession(sessionId)
+            _uiState.update {
                 it.copy(
                     showResumeDialog = false,
                     interruptedSession = null
@@ -323,5 +327,8 @@ data class RecordingUiState(
     // Ski-specific stats
     val skiDistance: Float = 0f,
     val skiVertical: Float = 0f,
-    val avgSkiSpeed: Float = 0f
+    val avgSkiSpeed: Float = 0f,
+
+    // Track points for live map
+    val trackPoints: List<TrackPoint> = emptyList()
 )

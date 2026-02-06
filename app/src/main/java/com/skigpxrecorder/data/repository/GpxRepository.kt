@@ -269,8 +269,8 @@ class GpxRepository @Inject constructor(
         }
     }
 
-    suspend fun clearCurrentSession() {
-        val sessionId = currentSession?.id
+    suspend fun clearCurrentSession(sessionId: String? = null) {
+        val idToDeactivate = sessionId ?: currentSession?.id
         currentSession = null
         trackPoints.clear()
         lastSavedIndex = 0
@@ -278,7 +278,7 @@ class GpxRepository @Inject constructor(
         _currentStats.value = StatsCalculator.TrackStats()
         _currentRuns.value = emptyList()
         getTempGpxFile().delete()
-        sessionId?.let { sessionDao.markSessionInactive(it) }
+        idToDeactivate?.let { sessionDao.markSessionInactive(it) }
     }
 
     suspend fun getActiveSession(): RecordingSession? {
