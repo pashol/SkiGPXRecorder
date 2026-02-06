@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -57,7 +58,8 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
     recordingViewModel: RecordingViewModel,
     onRequestPermission: () -> Unit,
-    onOpenFile: () -> Unit = {}
+    onOpenFile: () -> Unit = {},
+    drawerState: DrawerState? = null
 ) {
     NavHost(
         navController = navController,
@@ -68,7 +70,8 @@ fun AppNavigation(
             RecordingScreen(
                 viewModel = recordingViewModel,
                 navController = navController,
-                onRequestPermission = onRequestPermission
+                onRequestPermission = onRequestPermission,
+                drawerState = drawerState
             )
         }
 

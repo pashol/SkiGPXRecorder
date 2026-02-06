@@ -2,7 +2,7 @@ package com.skigpxrecorder.ui.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +22,7 @@ enum class MainTab(
     val label: String,
     val icon: ImageVector
 ) {
-    HISTORY("session_history", "HISTORIE", Icons.Default.List),
+    HISTORY("session_history", "HISTORIE", Icons.AutoMirrored.Filled.List),
     START("start", "START", Icons.Default.Home),
     HIGHSCORE("highscore", "HIGHSCORE", Icons.Default.Star)
 }

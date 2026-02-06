@@ -7,11 +7,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +30,7 @@ import com.skigpxrecorder.ui.RecordingScreen
 import com.skigpxrecorder.domain.FileImporter
 import com.skigpxrecorder.ui.RecordingViewModel
 import com.skigpxrecorder.ui.import.FileImportHandler
+import com.skigpxrecorder.ui.navigation.AppDrawer
 import com.skigpxrecorder.ui.navigation.AppNavigation
 import com.skigpxrecorder.ui.navigation.BottomNavBar
 import com.skigpxrecorder.ui.navigation.Screen
@@ -73,6 +77,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
                 val snackbarHostState = remember { SnackbarHostState() }
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 var triggerFileImport by remember { mutableStateOf(false) }
 
                 // Get current route for bottom nav
@@ -104,29 +109,43 @@ class MainActivity : ComponentActivity() {
                     "highscore"
                 )
 
-                Scaffold(
-                    bottomBar = {
-                        if (showBottomNav) {
-                            BottomNavBar(
-                                currentRoute = currentRoute,
-                                navController = navController
-                            )
-                        }
-                    },
-                    snackbarHost = { SnackbarHost(snackbarHostState) }
-                ) { paddingValues ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        AppNavigation(
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    gesturesEnabled = false,  // Disable swipe gesture to prevent conflict with map
+                    drawerContent = {
+                        AppDrawer(
                             navController = navController,
-                            recordingViewModel = viewModel,
-                            onRequestPermission = { checkAndRequestPermissions() },
+                            drawerState = drawerState,
+                            scope = scope,
                             onOpenFile = { triggerFileImport = true }
                         )
+                    }
+                ) {
+                    Scaffold(
+                        bottomBar = {
+                            if (showBottomNav) {
+                                BottomNavBar(
+                                    currentRoute = currentRoute,
+                                    navController = navController
+                                )
+                            }
+                        },
+                        snackbarHost = { SnackbarHost(snackbarHostState) }
+                    ) { paddingValues ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(paddingValues),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            AppNavigation(
+                                navController = navController,
+                                recordingViewModel = viewModel,
+                                onRequestPermission = { checkAndRequestPermissions() },
+                                onOpenFile = { triggerFileImport = true },
+                                drawerState = drawerState
+                            )
+                        }
                     }
                 }
             }

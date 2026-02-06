@@ -13,7 +13,7 @@ import com.skigpxrecorder.util.Constants
 
 @Database(
     entities = [RecordingSession::class, TrackPointEntity::class, SkiRunEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class SessionDatabase : RoomDatabase() {
@@ -76,6 +76,13 @@ abstract class SessionDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add location column for geocoded location names
+                db.execSQL("ALTER TABLE recording_sessions ADD COLUMN location TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): SessionDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -83,7 +90,7 @@ abstract class SessionDatabase : RoomDatabase() {
                     SessionDatabase::class.java,
                     Constants.DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

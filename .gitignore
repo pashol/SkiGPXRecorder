@@ -61,7 +61,9 @@ obj/
 
 # Misc
 nul
-ui/
 
 # Git worktrees
 .worktrees/
+
+# Secrets
+secrets.properties
